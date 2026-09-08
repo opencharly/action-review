@@ -42,7 +42,7 @@ jobs:
         with:
           ref: main
           path: runner-config
-      - name: Ensure charly (self-hosted image: no-op)
+      - name: "Ensure charly (self-hosted image: no-op)"
         id: ensure-charly
         env:
           CHARLY_VERSION: ${{ vars.CHARLY_VERSION || '' }}
