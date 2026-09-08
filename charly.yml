@@ -1,0 +1,91 @@
+version: 2026.248.1030
+defaults:
+  registry: ghcr.io/opencharly
+  tag: auto
+  platform: [linux/amd64]
+  build: [pac]
+
+# ── THE CONTRACT (runs on ANY runner: standard or self-hosted). ──
+# The workflow supplies every AI_REVIEW_* value as env (vars/secrets); this candy
+# declares the full surface (baked var: defaults for the self-hosted image, the
+# env/secret accept contract, the ADE checks). Content files (prompt/validator.md,
+# review-plan.yml) live beside charly.yml and are referenced by path. Wires the
+# plugin-review plugin into the project closure (the charly-mcp precedent: a
+# pure wiring candy, no install of its own).
+review-contract:
+  candy:
+    version: 2026.251.1928
+    description: |
+      Declares the env/secret contract of the ai-review gate: every value a review
+      run needs is an env var (set from GitHub vars/secrets), never committed.
+      Wires plugin-review into the closure and, in the self-hosted variant, is
+      composed by the review-runner image to carry the baked defaults.
+    candy:
+      - '@github.com/opencharly/plugin-review/candy/plugin-review:v2026.251.1928'
+    var:
+      AI_REVIEW_PROVIDER: openrouter
+      AI_REVIEW_MODEL: ~deepseek/deepseek-v4-flash-latest
+      AI_REVIEW_BASE_URL: https://openrouter.ai/api/v1
+      AI_REVIEW_MAX_TURNS: "20"
+    env_require:
+      - name: RUNNER_ORG
+        description: "GitHub org/user the runner registers with (self-hosted variant)"
+    env_accept:
+      - name: AI_REVIEW_PROVIDER
+        description: "LLM provider name (openrouter/openai/...)"
+      - name: AI_REVIEW_MODEL
+        description: "Model id for the provider"
+      - name: AI_REVIEW_BASE_URL
+        description: "Provider chat-completions base URL"
+      - name: AI_REVIEW_MAX_TURNS
+        description: "Max agent tool-calling turns"
+      - name: REVIEW_PROMPT_PATH
+        description: "Path to the validator rulebook (main checkout)"
+      - name: REVIEW_PLAN_PATH
+        description: "Path to the runtime orchestration plan"
+      - name: REVIEW_REPO
+        description: "Optional owner/repo override (defaults to the triggering repository)"
+      - name: GITHUB_TOKEN
+        description: "GitHub token for the read-only tools"
+      - name: GH_TOKEN
+        description: "Alias of GITHUB_TOKEN"
+    secret_accept:
+      - name: RUNNER_TOKEN
+        description: "GitHub Actions runner registration token (short-lived, one-shot at deploy)"
+      - name: AI_REVIEW_API_KEY
+        description: "LLM provider API key for the AI review (never committed)"
+        key: charly/api-key/ai-review
+      - name: ORG_GITHUB_TOKEN
+        description: "Optional org-scoped PAT for cross-repo review context"
+    plan:
+      - check: the review command is available and self-tests green
+        id: ade-review-present
+        context: [runtime]
+        command: charly review --self-test
+        exit_status: 0
+      - check: verdict extraction is exact (PASS/BLOCK only, line-anchored)
+        id: ade-verdict-matcher
+        context: [runtime]
+        command: charly review --self-test-verdict
+        exit_status: 0
+
+# ── THE SELF-HOSTED VARIANT (OPTIONAL — the default path needs none of this). ──
+# The layer-charly package (distro.arch) installs charly AND the welded plugins
+# (default variant — the charly weld PR adds plugin-review there) at
+# /usr/lib/charly/plugins; the image composes review-contract for the contract +
+# baked defaults and starts fully armed for the same steps.
+review-runner:
+  candy:
+    enabled: false
+    base: cachyos.cachyos
+    build: [pac]
+    network: host
+    platform: [linux/amd64]
+    candy:
+      - review-contract
+      - '@github.com/opencharly/layer-agent-forwarding:v2026.243.0408'
+      - '@github.com/opencharly/pod-github-runner:v2026.243.0410'
+      - '@github.com/opencharly/layer-charly:v2026.243.0408'
+      - '@github.com/opencharly/pod-dbus:v2026.243.1831'
+      - '@github.com/opencharly/layer-container-nesting:v2026.239.1647'
+      - '@github.com/opencharly/layer-gh:v2026.239.1624'

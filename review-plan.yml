@@ -1,0 +1,13 @@
+# The runtime orchestration for the ai-review gate (charly review --plan review-plan).
+# Adding ANY runtime plugin to the workflow = adding a step (or a plugins: entry)
+# HERE — the workflow YAML never changes. Read from the MAIN checkout (T1); a PR
+# under review can never redefine it. Secrets are never authored here — values
+# come from the job env only.
+version: 1
+plugins: []
+steps:
+  - id: review
+    kind: review            # the core engine (B1–B6 of the plan)
+    verdict: required       # must yield exactly one distinct Verdict: PASS|BLOCK
+    env:
+      - AI_REVIEW_MAX_TURNS

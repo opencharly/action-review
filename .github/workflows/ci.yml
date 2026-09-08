@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install charly (release assets, same as the gate bootstrap)
+        run: |
+          GH="$HOME/.local/charly"; mkdir -p "$GH/bin" "$GH/plugins"
+          gh release download --repo opencharly/charly --pattern 'charly-linux-amd64' --pattern 'charly-plugins-linux-amd64.tar.gz' --dir "$GH" --clobber
+          mv "$GH/charly-linux-amd64" "$GH/bin/charly" && chmod +x "$GH/bin/charly"
+          tar -xzf "$GH/charly-plugins-linux-amd64.tar.gz" -C "$GH/plugins"
+          echo "$GH/bin" >> "$GITHUB_PATH"
+          echo "CHARLY_PLUGIN_DIR=$GH/plugins" >> "$GITHUB_ENV"
+          charly version
+      - name: config gates
+        run: |
+          charly box validate
+          test -f review-plan.yml && test -f prompt/validator.md && grep -q '^Verdict: PASS' prompt/validator.md && echo PROMPT_OK
+      - name: workflow lint (actionlint)
+        uses: docker://rhysd/actionlint:latest
+        with:
+          args: -color
