@@ -17,3 +17,4 @@ the retired `opencharly/pi-review-action`, built on charly + the
   plugin-review).
 
 See `docs/action-review.md` for the env/secret table, deploy, and cutover notes.
+- smoke: validated by the new gate (2026-09-08)
