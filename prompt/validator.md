@@ -132,6 +132,17 @@ promises future work ("will test") BLOCKS. Require ALL of:
   `*Assisted-by: <Harness> <Provider Full Model Name> (<confidence>)*` line, in that exact
   form. A body opening with prose like "this PR was authored by an AI agent" instead of
   ending with the `Assisted-by:` line does NOT satisfy it.
+- **A MODEL-FREE bot body — the `<Harness> <Runtime>` form.** A PR body emitted by a fixed,
+  model-free generator (a committed CI `printf/echo` block with no LLM in the loop — the
+  nightly `sync.yml` / `refresh.yml` bots) carries NEITHER an AI provider nor an AI model, so
+  the AI form above cannot be truthfully filled. Such a body MUST END with the italicized
+  `*Assisted-by: <Harness> <Runtime> (<confidence>)*` line — e.g.
+  `*Assisted-by: GitHub Actions ubuntu-latest (fully tested and validated)*` — where
+  `<Harness>` is the automation that ran it (`GitHub Actions`) and `<Runtime>` is the runner
+  identity it executed on. Do NOT fabricate an AI model name in the `<Provider Full Model
+  Name>` slot, and do NOT cite this clause to justify an `N/A` placeholder: either the body is
+  AI-authored (use the AI form) or model-free (use this form), never a hybrid. A 100% human-authored
+  body still omits the line entirely (per the PR template).
 
 A2 — Change class → gate match. Classify the diff (docs-only vs code/config vs
 hook/workflow vs cross-repo) and confirm the evidence matches that gate:
