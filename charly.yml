@@ -532,7 +532,7 @@ review-contract:
       - name: AI_REVIEW_CONTEXT_MARGIN
         description: "Headroom kept below the context window"
       - name: AI_REVIEW_MAX_TURNS
-        description: "Max agent turns (forwarded by the workflow; its default is 20)"
+        description: "Max agent turns (contract default 60)"
       - name: AI_REVIEW_TEMPERATURE
         description: "Sampling temperature (vendor default 1.0)"
       - name: AI_REVIEW_TOP_P
