@@ -28,7 +28,7 @@ review-contract:
       variant, is composed by the review-runner image to carry the baked defaults.
       Every value may be overridden in the opencharly org GitHub settings.
     candy:
-      - '@github.com/opencharly/plugin-review/candy/plugin-review:v2026.266.2359'
+      - '@github.com/opencharly/plugin-review/candy/plugin-review:v2026.270.1323'
     var:
       AI_REVIEW_PROVIDER: ollama-cloud
       AI_REVIEW_MODEL: deepseek-v4.1-flash
@@ -519,10 +519,38 @@ review-contract:
         description: "Model id for the provider"
       - name: AI_REVIEW_BASE_URL
         description: "Provider chat-completions base URL"
+      - name: AI_REVIEW_REASONING_EFFORT
+        description: "Thinking depth: high | medium | low | max | none (empty disables)"
+      - name: AI_REVIEW_MAX_TOKENS
+        description: "Shared reasoning+answer token budget"
+      - name: AI_REVIEW_STREAM_IDLE_TIMEOUT
+        description: "Seconds of streamed silence before the turn fails"
+      - name: AI_REVIEW_ATTEMPT_TIMEOUT
+        description: "Whole-request cap in seconds (0 = no cap)"
+      - name: AI_REVIEW_CONTEXT_TOKENS
+        description: "Model context window (the fail-closed size guard)"
+      - name: AI_REVIEW_CONTEXT_MARGIN
+        description: "Headroom kept below the context window"
+      - name: AI_REVIEW_MAX_TURNS
+        description: "Max agent turns (forwarded by the workflow; its default is 20)"
+      - name: AI_REVIEW_TEMPERATURE
+        description: "Sampling temperature (vendor default 1.0)"
+      - name: AI_REVIEW_TOP_P
+        description: "Nucleus sampling probability mass"
+      - name: AI_REVIEW_FREQUENCY_PENALTY
+        description: "Frequency penalty (-2..2)"
+      - name: AI_REVIEW_PRESENCE_PENALTY
+        description: "Presence penalty (-2..2)"
+      - name: AI_REVIEW_TOOL_RESULT_MAX_BYTES
+        description: "Per-tool-result byte cap (forwarded by the workflow)"
+      - name: AI_REVIEW_POST_COMMENT
+        description: "Post the review as ONE PR comment (true/false)"
+      - name: AI_REVIEW_DEBUG
+        description: "Emit the request trace AND dump the full reasoning"
+      - name: AI_REVIEW_MAX_ATTEMPTS
+        description: "Whole-review attempt cap (1 = no retry)"
       - name: AI_REVIEW_PROMPT
         description: "FULL review rulebook; REPLACES the engine's generic embedded default (set it here or in the org settings)"
-      - name: AI_REVIEW_MAX_TURNS
-        description: "Max agent tool-calling turns"
       - name: REVIEW_PLAN_PATH
         description: "Path to the runtime orchestration plan"
       - name: REVIEW_REPO
