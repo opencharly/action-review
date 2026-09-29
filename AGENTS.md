@@ -15,8 +15,8 @@ Canonical files:
   self-hosted image definition).
 - `review-plan.yml` — the step list the `charly review --plan` executor walks;
   runtime plugins join the workflow purely through config.
-- `prompt/validator.md` — the PR-validator prompt (must begin with `Verdict:
-  PASS`).
+- `prompt/validator.md` — the PR-validator prompt (its PASS output template
+  carries a line `Verdict: PASS`).
 - `.github/workflows/ai-review.yml` — the gate itself; `.github/workflows/ci.yml`
   — `charly box validate` + the prompt/plan presence gates + actionlint;
   `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.
@@ -41,8 +41,9 @@ skill projected) is recorded against `opencharly/opencharly#291`.
 
 - `.github/workflows/ci.yml` is the config gate: it installs charly from the
   pinned release assets, runs `charly box validate`, asserts `review-plan.yml` +
-  `prompt/validator.md` exist and that the prompt begins with `Verdict: PASS`, and
-  lints the workflows with `actionlint`.
+  `prompt/validator.md` exist and that the prompt contains a line `Verdict: PASS`
+  (`grep -q '^Verdict: PASS' prompt/validator.md`), and lints the workflows with
+  `actionlint`.
 - The gate itself is `.github/workflows/ai-review.yml`; `review-plan.yml` decides
   which plugins/steps run.
 - The merge gate is the **org-wide** `charly/pr-validator` (required check
