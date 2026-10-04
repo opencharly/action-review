@@ -1,10 +1,25 @@
-# The NEW ai-review gate (the cutover artefact) — runs the plugin-review charly
-# plugin on a STANDARD GitHub runner by default (ubuntu-latest); self-hosted via
-# vars.REVIEW_RUNNER_LABEL. Which plugins/steps run lives in review-plan.yml
-# (charly review --plan); this file never changes for that. Until the welded
-# charly release exists, this workflow's ensure-charly self-test stays red by
-# design (no-ops only once plugin-review ships in the release tarball); the org
-# validator (pr-validator.yml) gates PRs in the interim.
+# The ai-review gate — the per-repo review check.
+#
+# It runs the SAME engine and the SAME rulebook as the org-wide REQUIRED gate
+# (opencharly/.github `pr-validator.yml`), so ONE rulebook governs every review
+# check in the org (opencharly/.github#126): the engine is the ORG PIN
+# `vars.CHARLY_VERSION` (an on-PATH charly is used ONLY when its version EQUALS
+# the pin), and the rulebook is the LIVE org variable `AI_REVIEW_PROMPT`, which
+# REPLACES the engine's generic embedded default.
+#
+# There is no plan file and no prompt-path file: the plain `charly review --out`
+# form is accepted by BOTH the pre-rewrite engine and the embedded-prompt engine,
+# so the invocation is weld-independent. The retired `--plan` mechanism
+# (`review-plan.yml`, `prompt/validator.md`, the `REVIEW_PLAN_PATH` /
+# `REVIEW_PROMPT_PATH` knobs) is gone — see opencharly/.github#126.
+#
+# VERDICT TAXONOMY — these classes are NEVER conflated:
+#   PASS         -> exit 0, auto-merge armed — ONLY for a review that exited 0.
+#   BLOCK        -> exit 1 — a real code finding from the reviewer.
+#   INCONCLUSIVE -> exit 3 — no TRUSTWORTHY verdict was produced (provider
+#                   unanswered, or a verdict-less review output). NOT a BLOCK and
+#                   NOT a pass: the check stays RED, so unreviewed code cannot merge.
+#   AMBIGUOUS    -> exit 2 — mixed PASS+BLOCK lines in one review.
 name: ai-review
 
 on:
@@ -28,6 +43,13 @@ jobs:
   validate:
     name: validate
     runs-on: ${{ vars.REVIEW_RUNNER_LABEL || 'ubuntu-latest' }}
+    # FAIL-HARD wall clock. A provider-unanswered review burns the whole engine
+    # attempt budget with no interim output before it classifies INCONCLUSIVE, and
+    # GitHub's default (360) would let a doomed run occupy a runner for six hours.
+    # Observed reviews conclude well inside 20 minutes; the cap makes the required
+    # check go RED fast instead of hanging pending, and the gate is then re-run
+    # explicitly — never retried in-job (R4).
+    timeout-minutes: 20
     environment: ai-review
     steps:
       - id: pr
@@ -46,55 +68,305 @@ jobs:
         with:
           ref: main
           path: runner-config
-      - name: "Ensure charly (self-hosted image: no-op)"
+          fetch-depth: 1
+      - name: "Ensure charly (pinned engine; self-hosted image: no-op)"
         id: ensure-charly
         env:
           CHARLY_VERSION: ${{ vars.CHARLY_VERSION || '' }}
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if command -v charly >/dev/null 2>&1; then
-            echo "charly present: $(charly version)"; exit 0
+          # ENGINE PIN ENFORCEMENT. The gate must run the ORG-PINNED engine
+          # (vars.CHARLY_VERSION), because the engine's behaviour lives in the
+          # charly binary's WELDED plugin-review. A bare
+          # `if command -v charly; then exit 0` would trust ANY on-PATH charly —
+          # so on a self-hosted runner whose image bakes an OLD charly the pin
+          # would never be downloaded and the gate would silently run a stale
+          # engine. An on-PATH charly is therefore used ONLY when its version
+          # EQUALS the pin; otherwise the pinned release is downloaded and
+          # PREPENDED to PATH, so the pinned engine always wins.
+          if [ -z "${CHARLY_VERSION:-}" ]; then
+            echo "::error::vars.CHARLY_VERSION is unset or not visible to this repo — refusing to run an unpinned review engine"
+            exit 3
           fi
-          TAG="${CHARLY_VERSION:-$(gh release view --repo opencharly/charly --json tagName --jq .tagName)}"
-          D="$HOME/.local/charly"; mkdir -p "$D/bin" "$D/plugins"
-          gh release download "$TAG" --repo opencharly/charly \
-            --pattern 'charly-linux-amd64' --pattern 'charly-plugins-linux-amd64.tar.gz' \
-            --dir "$D" --clobber
-          mv "$D/charly-linux-amd64" "$D/bin/charly" && chmod +x "$D/bin/charly"
-          tar -xzf "$D/charly-plugins-linux-amd64.tar.gz" -C "$D/plugins"
-          echo "$D/bin" >> "$GITHUB_PATH"
-          echo "CHARLY_PLUGIN_DIR=$D/plugins" >> "$GITHUB_ENV"
-          CHARLY_PLUGIN_DIR="$D/plugins" "$D/bin/charly" review --self-test
-      - name: Run review plan (steps + runtime plugins declared in review-plan.yml)
+          TAG="$CHARLY_VERSION"
+          WANT="${TAG#v}"   # the pin tag minus its leading 'v': v<CalVer> -> <CalVer>
+          CHARLY_BIN=""; CHARLY_PDIR=""
+          if command -v charly >/dev/null 2>&1; then
+            HAVE="$(charly version 2>/dev/null | grep -oE '[0-9]{4}\.[0-9]{3}\.[0-9]{4}' | head -1 || true)"
+            if [ "$HAVE" = "$WANT" ]; then
+              echo "charly on PATH matches the pin ($HAVE) — using it"
+              CHARLY_BIN="$(command -v charly)"
+            else
+              echo "::warning::on-PATH charly $HAVE != pinned $WANT — downloading the pinned engine (the welded plugin-review differs; a stale engine produces no verdict)"
+            fi
+          fi
+          if [ -z "$CHARLY_BIN" ]; then
+            # PER-RUN dir (runner.temp, wiped between jobs): on self-hosted runners
+            # $HOME persists across jobs and a stale plugin binary there crashes the
+            # gate. No runtime latest-resolution — TAG is the pin verbatim.
+            D="${{ runner.temp }}/charly-$TAG"; mkdir -p "$D/bin" "$D/plugins"
+            # Release assets are public — tokenless curl (gh/GITHUB_TOKEN injection is
+            # unreliable in restricted step envs).
+            curl -fsSL -o "$D/charly-linux-amd64" "https://github.com/opencharly/charly/releases/download/$TAG/charly-linux-amd64"
+            curl -fsSL -o "$D/charly-plugins-linux-amd64.tar.gz" "https://github.com/opencharly/charly/releases/download/$TAG/charly-plugins-linux-amd64.tar.gz"
+            mv "$D/charly-linux-amd64" "$D/bin/charly" && chmod +x "$D/bin/charly"
+            tar -xzf "$D/charly-plugins-linux-amd64.tar.gz" -C "$D/plugins"
+            echo "$D/bin" >> "$GITHUB_PATH"
+            echo "CHARLY_PLUGIN_DIR=$D/plugins" >> "$GITHUB_ENV"
+            CHARLY_BIN="$D/bin/charly"; CHARLY_PDIR="$D/plugins"
+          fi
+          # PROBE THE ENGINE THAT WILL RUN — a HARD gate, on the resolved engine, in
+          # BOTH resolution paths (the pin-matched on-PATH charly and the downloaded
+          # one). A bootstrap that cannot resolve the `review` command cannot review,
+          # so it fails HERE, at the engine the gate selected, instead of surfacing
+          # later as a verdict-less run. Measured on this gate's own live run:
+          # `plugin-review self-test: ok (command:review resolves)`.
+          if [ -n "$CHARLY_PDIR" ]; then
+            CHARLY_PLUGIN_DIR="$CHARLY_PDIR" "$CHARLY_BIN" review --self-test
+          else
+            "$CHARLY_BIN" review --self-test
+          fi
+      - name: Run the review engine (assemble context, verdict)
         id: review
         env:
           PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number }}
-          AI_REVIEW_PROVIDER: ${{ vars.AI_REVIEW_PROVIDER }}
-          AI_REVIEW_MODEL:     ${{ vars.AI_REVIEW_MODEL }}
-          AI_REVIEW_BASE_URL:  ${{ vars.AI_REVIEW_BASE_URL }}
+          AI_REVIEW_PROVIDER: ${{ vars.AI_REVIEW_PROVIDER || '' }}
+          AI_REVIEW_MODEL:     ${{ vars.AI_REVIEW_MODEL || '' }}
+          AI_REVIEW_BASE_URL:  ${{ vars.AI_REVIEW_BASE_URL || '' }}
+          # THE RULEBOOK. This is the SINGLE prompt mechanism: the live org variable
+          # replaces the engine's generic embedded default, so this check and the
+          # org-wide required gate review with the SAME rulebook
+          # (opencharly/.github#126). No prompt PATH is passed and none exists.
+          # Two layers resolve this value; each is stated as what it provably does:
+          #   1. CONTRACT layer — charly.yml declares the live rulebook as this name's
+          #      `var:` default (the in-tree copy, kept byte-identical).
+          #   2. ENGINE layer — the engine reads the value with envStr
+          #      (plugin-review candy/plugin-review/config.go): a SET value governs the
+          #      run, and the engine's OWN fallback is its embedded generic prompt (the
+          #      engine reads no prompt FILE at all).
+          # This step forwards the org variable VERBATIM — never a rewritten or
+          # truncated copy — and the org sets it. Measured on this gate's own live run:
+          # `reasoning_effort="medium"` (the org value, over this contract's `high`) and
+          # `system=31966` bytes of prompt, i.e. the rulebook — not the engine's
+          # 2857-byte generic default.
+          AI_REVIEW_PROMPT: ${{ vars.AI_REVIEW_PROMPT }}
+          AI_REVIEW_POST_COMMENT: ${{ vars.AI_REVIEW_POST_COMMENT || '' }}
+          # The engine STREAMS, so the meaningful bound is SILENCE between chunks,
+          # and the whole-request cap bounds the ONE model call. An org var left
+          # UNSET is forwarded as '' — the engine treats '' as unset and applies its
+          # own default; the job's timeout-minutes is the wall-clock backstop above.
+          AI_REVIEW_STREAM_IDLE_TIMEOUT: ${{ vars.AI_REVIEW_STREAM_IDLE_TIMEOUT || '' }}
+          AI_REVIEW_ATTEMPT_TIMEOUT: ${{ vars.AI_REVIEW_ATTEMPT_TIMEOUT || '' }}
+          AI_REVIEW_TEMPERATURE: ${{ vars.AI_REVIEW_TEMPERATURE || '' }}
+          AI_REVIEW_TOP_P: ${{ vars.AI_REVIEW_TOP_P || '' }}
+          AI_REVIEW_FREQUENCY_PENALTY: ${{ vars.AI_REVIEW_FREQUENCY_PENALTY || '' }}
+          AI_REVIEW_PRESENCE_PENALTY: ${{ vars.AI_REVIEW_PRESENCE_PENALTY || '' }}
+          AI_REVIEW_CONTEXT_TOKENS: ${{ vars.AI_REVIEW_CONTEXT_TOKENS || '' }}
+          AI_REVIEW_CONTEXT_MARGIN: ${{ vars.AI_REVIEW_CONTEXT_MARGIN || '' }}
+          AI_REVIEW_REASONING_EFFORT: ${{ vars.AI_REVIEW_REASONING_EFFORT || '' }}
+          AI_REVIEW_MAX_TOKENS: ${{ vars.AI_REVIEW_MAX_TOKENS || '' }}
+          AI_REVIEW_DEBUG: ${{ vars.AI_REVIEW_DEBUG || '' }}
+          # Degenerate-repetition guard and provider session affinity — both read by
+          # the engine (AI_REVIEW_STOP, AI_REVIEW_SESSION_ID).
+          AI_REVIEW_STOP: ${{ vars.AI_REVIEW_STOP || '' }}
+          AI_REVIEW_SESSION_ID: ${{ vars.AI_REVIEW_SESSION_ID || '' }}
           AI_REVIEW_API_KEY:   ${{ secrets.AI_REVIEW_API_KEY }}
-          REVIEW_PROMPT_PATH:  ${{ github.workspace }}/runner-config/prompt/validator.md
-          REVIEW_PLAN_PATH:    ${{ github.workspace }}/runner-config/review-plan.yml
           GITHUB_TOKEN:        ${{ github.token }}
         run: |
           cd "$GITHUB_WORKSPACE/runner-config"
-          charly review --plan "$REVIEW_PLAN_PATH" --out /tmp/review.txt
+
+          # /tmp/review.txt is written ONLY by a fully successful review, so clear
+          # it first: a stale file must never be parsed as THIS run's verdict.
+          rm -f /tmp/review.txt /tmp/review.log
+
+          # bash -e must NOT abort here: a verdict-less run is a CLASS to report,
+          # not a crash. NO RETRY — a retry re-runs the same doomed generation (R4).
+          rc=0
+          charly review --out /tmp/review.txt > /tmp/review.log 2>&1 || rc=$?
+          echo "review rc=$rc"
+          cat /tmp/review.log
+
+          # The engine names its terminal class in ONE line (`inconclusive: …`). The
+          # class is derived from THAT line's OWN text, so a whole-request cap, an
+          # empty completion and a provider stall are never folded into one another
+          # (opencharly/.github#133). A marker this workflow keeps no narrative for
+          # yields `engine-terminal-other`, and the notice then DEFERS to the
+          # engine's own line instead of inventing a cause. Two bounded lines — the
+          # terminal line and the engine's `request —` line (the bounds in force) —
+          # are carried to the notice as MEASURED evidence; never the log.
+          terminal=$(grep -m1 -oE 'inconclusive: .*' /tmp/review.log | cut -c1-500 || true)
+          request=$(grep -m1 -oE 'request — reasoning_effort=.*' /tmp/review.log | cut -c1-400 || true)
+          inconclusive_class=""
+          if [ -n "$terminal" ]; then
+            case "$terminal" in
+              *"exceeded AI_REVIEW_ATTEMPT_TIMEOUT"*)           inconclusive_class="attempt-cap" ;;
+              *"produced no answer"*)                           inconclusive_class="empty-completion" ;;
+              *"provider never answered or stopped streaming"*) inconclusive_class="provider-unanswered" ;;
+              *)                                                inconclusive_class="engine-terminal-other" ;;
+            esac
+          fi
+          # `provider_unanswered` keeps its meaning: the engine SAID the provider
+          # stalled — or, ONLY when the engine named no class at all (a step abort, a
+          # kill, an HTTP refusal), the log carries a stall marker. The fallback
+          # deliberately does NOT match `inconclusive:` — that substring is true for
+          # EVERY class the engine names, and matching it here is exactly what folded
+          # every class into this one (#133).
+          provider_unanswered=false
+          if [ "$inconclusive_class" = "provider-unanswered" ]; then
+            provider_unanswered=true
+          elif [ -z "$terminal" ] &&
+             grep -qiE 'provider unanswered|Client[.]Timeout exceeded|context deadline exceeded' /tmp/review.log; then
+            provider_unanswered=true
+          fi
+
+          verdict=""
+          if [ -f /tmp/review.txt ]; then
+            verdict=$(grep -E '^Verdict: (BLOCK|PASS)[[:space:]]*$' /tmp/review.txt | sed -E 's/^Verdict: (BLOCK|PASS).*/\1/' | sort -u || true)
+          fi
+
+          # FAIL-CLOSED on the review exit code: capturing rc must never mean weaker
+          # than the `bash -e` it replaced. rc != 0 means the review did not complete
+          # cleanly, so the ONLY class such a run may carry is BLOCK (a real finding,
+          # written before the failure). Any other verdict a non-zero run wrote is
+          # UNTRUSTWORTHY — a crashed or stalled reviewer must never arm auto-merge on
+          # a stray PASS line. The file is moved ASIDE so Parse verdict finds nothing
+          # and classifies INCONCLUSIVE (exit 3, check RED).
+          discarded=false
+          if [ -n "$verdict" ] && [ "$rc" -ne 0 ] && [ "$verdict" != "BLOCK" ]; then
+            discarded=true
+            echo "::warning::review rc=$rc wrote $verdict — FAIL-CLOSED (a non-zero review exit may only carry BLOCK)"
+            mv /tmp/review.txt /tmp/review.untrusted.txt
+            verdict=""
+          fi
+
+          {
+            echo "review_rc=$rc"
+            echo "inconclusive_class=$inconclusive_class"
+            echo "engine_terminal=$terminal"
+            echo "engine_request=$request"
+            echo "provider_unanswered=$provider_unanswered"
+            echo "discarded_verdict=$discarded"
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$verdict" ]; then
+            # ONLY the first line: a multi-line value would break the GITHUB_OUTPUT
+            # 'name=value' format. Mixed PASS+BLOCK is classified by Parse verdict.
+            echo "verdict=$(printf '%s\n' "$verdict" | sed -n '1p')" >> "$GITHUB_OUTPUT"
+          fi
       - name: Parse verdict
         id: parse
+        env:
+          REVIEW_RC: ${{ steps.review.outputs.review_rc }}
         run: |
-          verdict='${{ steps.review.outputs.verdict }}'
-          [ -n "$verdict" ] || { echo "::error::No verdict from plan executor"; exit 2; }
-          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          found=""
+          if [ -f /tmp/review.txt ]; then
+            found=$(grep -E '^Verdict: (BLOCK|PASS)[[:space:]]*$' /tmp/review.txt || true)
+          fi
+          n=0
+          if [ -n "$found" ]; then
+            n=$(printf '%s\n' "$found" | grep -cE '^Verdict:')
+          fi
+          if [ "$n" -eq 0 ]; then
+            # NO Verdict line: the two classes behind this (provider unanswered /
+            # verdict-less review output) are NOT code findings. Classify
+            # INCONCLUSIVE; the Gate step reports it honestly and keeps the check RED.
+            echo "verdict=INCONCLUSIVE" >> "$GITHUB_OUTPUT"
+            echo "::warning::no Verdict line in the review output (provider_unanswered=${{ steps.review.outputs.provider_unanswered }}, review_rc=${REVIEW_RC:-n/a}) — INCONCLUSIVE"
+            exit 0
+          fi
+          distinct=$(printf '%s\n' "$found" | sed -E 's/^Verdict: (BLOCK|PASS).*/\1/' | sort -u)
+          # FAIL-CLOSED: a non-zero review exit may only carry a real BLOCK finding.
+          # A PASS — or a mixed PASS+BLOCK — read from a file an rc != 0 run wrote is
+          # not a trustworthy pass: INCONCLUSIVE, the check stays RED.
+          if [ "${REVIEW_RC:-0}" != "0" ] && [ "$distinct" != "BLOCK" ]; then
+            echo "verdict=INCONCLUSIVE" >> "$GITHUB_OUTPUT"
+            echo "::warning::review rc=${REVIEW_RC}, verdict not BLOCK — FAIL-CLOSED"
+            exit 0
+          fi
+          count=$(printf '%s\n' "$distinct" | wc -l | tr -d ' ')
+          if [ "$count" -gt 1 ]; then
+            echo "verdict=AMBIGUOUS" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "verdict=$distinct" >> "$GITHUB_OUTPUT"
       - name: Gate (BLOCK)
         if: steps.parse.outputs.verdict == 'BLOCK'
         run: |
           echo "::error::AI review blocked this PR"
           exit 1
-      - name: Gate (ambiguous)
-        if: steps.parse.outputs.verdict != 'PASS' && steps.parse.outputs.verdict != 'BLOCK'
+      # INCONCLUSIVE is NOT a BLOCK: no code finding was produced — the provider
+      # never answered, or the review yielded no Verdict line. Report that plainly on
+      # the PR and keep the required check RED: unreviewed code must never merge, and
+      # turning this into a pass would silently defeat the gate. The notice carries
+      # the engine's OWN two lines (the terminal class + the bounds in force) as
+      # measured evidence — never the log, which on a runaway run is hundreds of KB
+      # and would be re-ingested by the NEXT review (opencharly/charly#712).
+      - name: Gate (inconclusive)
+        if: steps.parse.outputs.verdict == 'INCONCLUSIVE'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          INCONCLUSIVE_CLASS: ${{ steps.review.outputs.inconclusive_class }}
+          ENGINE_TERMINAL: ${{ steps.review.outputs.engine_terminal }}
+          ENGINE_REQUEST: ${{ steps.review.outputs.engine_request }}
+          REVIEW_RC: ${{ steps.review.outputs.review_rc }}
         run: |
-          echo "::error::Ambiguous verdict from AI review"
+          class="verdict-less review output"
+          cause="**Root cause.** The review produced no Verdict line and this log carries none of the recognised engine-terminal markers. The gate therefore REPORTS the class rather than inventing a cause; the full log is in this run's job output."
+          case "$INCONCLUSIVE_CLASS" in
+            attempt-cap)
+              class="whole-request cap (the ONE review call ran past AI_REVIEW_ATTEMPT_TIMEOUT and was cut; not retried)"
+              cause="**Root cause (measured in this run).** The engine's own terminal line names the class: the generation ran longer than the whole-request cap. A generation that long is a reasoning-length problem — compare \`reasoning_effort\` and \`max_tokens\` in the request line below with the org vars. Raising a cap only DETECTS a long generation; the effort and the token budget BOUND it (R4)."
+              ;;
+            empty-completion)
+              class="empty completion (the shared token budget was spent on reasoning before any answer; not retryable)"
+              cause="**Root cause (measured in this run).** The engine's own terminal line names the class: the model used the shared \`max_tokens\` budget on reasoning and produced no answer. A re-run with the same bounds reproduces it — raise \`AI_REVIEW_MAX_TOKENS\` (or lower \`AI_REVIEW_REASONING_EFFORT\`) instead of retrying (R4)."
+              ;;
+            provider-unanswered)
+              class="provider unanswered (the endpoint stopped answering within the stream-idle bound)"
+              cause="**Root cause (measured in this run).** The model endpoint stopped answering — no response headers, or a stream that went silent past \`AI_REVIEW_STREAM_IDLE_TIMEOUT\`. That is a provider/endpoint matter, not a code finding; escalate to the operator rather than re-running in a loop (R4)."
+              ;;
+            engine-terminal-other)
+              class="the engine's own terminal line names the class (this workflow keeps no narrative for this marker, so it DEFERS to the line): $(printf '%s' "$ENGINE_TERMINAL" | cut -c1-180)"
+              cause="**Root cause (measured in this run).** The engine classified the run itself, and its terminal line is quoted below. For a marker this workflow has no bespoke narrative for, the gate does not re-derive a cause from a signature: the engine's own line IS the diagnosis, and the instruction it carries (every engine class names the knob to change) is the remedy."
+              ;;
+          esac
+          {
+            echo '## validator INCONCLUSIVE — no review verdict was produced (not a BLOCK; no code finding)'
+            echo
+            echo 'The gate could **not** obtain a review verdict on this run, so it produced **no code finding**. This is **not** a BLOCK and the PR is **not** being rejected — but the required check stays **RED on purpose**: unreviewed code must never merge.'
+            echo
+            echo "- class: $class"
+            echo "- review exit code: ${REVIEW_RC:-n/a}"
+            echo "- in-job retries: none — the gate REPORTS the class instead of papering over it (R4)"
+            echo
+            echo "$cause"
+            echo
+            if [ -n "$ENGINE_REQUEST$ENGINE_TERMINAL" ]; then
+              echo '**Measured in this run** (the engine'"'"'s own lines):'
+              echo
+              echo '```text'
+              if [ -n "$ENGINE_REQUEST" ]; then echo "$ENGINE_REQUEST"; fi
+              if [ -n "$ENGINE_TERMINAL" ]; then echo "$ENGINE_TERMINAL"; fi
+              echo '```'
+              echo
+            fi
+            echo '_Full diagnostics: this run'"'"'s job log (not embedded here — embedding a runaway log would feed it into the next review and deepen the collapse)._'
+          } > /tmp/inconclusive-comment.md
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file /tmp/inconclusive-comment.md || echo "::warning::could not post the INCONCLUSIVE comment (non-fatal)"
+          echo "::error::validator INCONCLUSIVE — no review verdict was produced (not a BLOCK; no code finding) — see the PR comment"
+          exit 3
+      - name: Gate (ambiguous)
+        if: steps.parse.outputs.verdict != 'PASS' && steps.parse.outputs.verdict != 'BLOCK' && steps.parse.outputs.verdict != 'INCONCLUSIVE'
+        run: |
+          echo "::error::Ambiguous verdict from AI review (mixed PASS+BLOCK, or an unparsable verdict output)"
           exit 2
+      # Enable auto-merge — RESILIENTLY. GitHub rejects the mutation with
+      # "Pull request is in unstable status" while any required check is still
+      # pending/failing, and repos may legitimately carry more than one check
+      # besides this one. The REVIEW verdict is already PASS here, so arming
+      # logistics must never turn the required check red: retry through transient
+      # settling states and soft-skip (warning) when the repository setting does
+      # not allow auto-merge.
       - name: Enable auto-merge
         if: steps.parse.outputs.verdict == 'PASS'
         env:
