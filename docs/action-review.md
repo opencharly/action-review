@@ -7,13 +7,15 @@ in `charly.yml`; secrets arrive as GitHub secrets → job env vars.
 
 ## Repos
 
-- `opencharly/plugin-review` — the charly plugin (verb:pr + command:review + --plan executor).
+- `opencharly/plugin-review` — the charly plugin (verb:pr + command:review).
 - `opencharly/action-review` (this repo) — the workflow + config.
 
 ## Environment (`ai-review`)
 
 Vars: AI_REVIEW_PROVIDER, AI_REVIEW_MODEL, AI_REVIEW_BASE_URL,
-CHARLY_VERSION (optional pin), REVIEW_RUNNER_LABEL (self-hosted opt-in).
+CHARLY_VERSION (the ENGINE PIN — REQUIRED; the gate refuses to run an unpinned
+engine), REVIEW_RUNNER_LABEL (self-hosted opt-in), and the review-behaviour and
+generation-bound knobs the engine reads (AI_REVIEW_PROMPT is the rulebook).
 Secrets: AI_REVIEW_API_KEY. Automatic: GITHUB_TOKEN, PR_NUMBER.
 
 ## Self-hosted variant (optional)

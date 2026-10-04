@@ -5,20 +5,16 @@ for the retired `opencharly/pi-review-action`, built on charly + the
 [plugin-review](https://github.com/opencharly/plugin-review) plugin only. The
 gate runs the welded `charly review` word on a standard GitHub runner by default
 (self-hosted opt-in via `vars.REVIEW_RUNNER_LABEL`), configured entirely from
-`charly.yml` + `review-plan.yml`.
+`charly.yml` — the rulebook in force being the org variable `AI_REVIEW_PROMPT`.
 
 Canonical files:
 
 - `charly.yml` — the review **contract**: the `review-contract:` candy (the
-  `AI_REVIEW_*` `var:` surface + the full `AI_REVIEW_PROMPT` rulebook, composing
+  `AI_REVIEW_*` `var:` surface + the committed `AI_REVIEW_PROMPT` default, composing
   `plugin-review`) and the `review-runner:` candy (the `enabled: false`
   self-hosted image definition).
-- `review-plan.yml` — the step list the `charly review --plan` executor walks;
-  runtime plugins join the workflow purely through config.
-- `prompt/validator.md` — the PR-validator prompt (its PASS output template
-  carries a line `Verdict: PASS`).
 - `.github/workflows/ai-review.yml` — the gate itself; `.github/workflows/ci.yml`
-  — `charly box validate` + the prompt/plan presence gates + actionlint;
+  — `charly box validate` + the retired-mechanism absence gates + actionlint;
   `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.
 - `docs/action-review.md` — the env/secret table, deploy, and cutover notes.
 - `README.md` — user overview only; never agent guidance.
@@ -39,13 +35,20 @@ skill projected) is recorded against `opencharly/opencharly#291`.
 
 ## Build / validate / test
 
-- `.github/workflows/ci.yml` is the config gate: it installs charly from the
-  pinned release assets, runs `charly box validate`, asserts `review-plan.yml` +
-  `prompt/validator.md` exist and that the prompt contains a line `Verdict: PASS`
-  (`grep -q '^Verdict: PASS' prompt/validator.md`), and lints the workflows with
-  `actionlint`.
-- The gate itself is `.github/workflows/ai-review.yml`; `review-plan.yml` decides
-  which plugins/steps run.
+- `.github/workflows/ci.yml` is the config gate: it installs charly from the LATEST
+  `opencharly/charly` release assets (`gh release download` with no `--tag`), runs
+  `charly box validate`, asserts the retired `--plan` mechanism is ABSENT
+  (`review-plan.yml`, `prompt/validator.md`, and any
+  `REVIEW_PLAN_PATH`/`REVIEW_PROMPT_PATH` in `charly.yml`), asserts the contract
+  still declares `AI_REVIEW_PROMPT`, and lints the workflows with `actionlint`.
+  It deliberately does NOT install `vars.CHARLY_VERSION`: under the current org pin
+  `charly box validate` rejects the stamp-less contract, so a pinned config gate
+  would be red on every PR. That divergence — pin vs contract-vs-age, and a config
+  gate that proves nothing about the pinned engine — is `opencharly/.github#162`.
+- The gate itself is `.github/workflows/ai-review.yml`. It is configured entirely by
+  the `AI_REVIEW_*` vars: it runs the org-pinned engine and forwards the live org
+  variable `AI_REVIEW_PROMPT`, so this check and the org-wide required gate review
+  with ONE rulebook (`opencharly/.github#126`).
 - The merge gate is the **org-wide** `charly/pr-validator` (required check
   `validate / validate`, defined in `opencharly/.github`).
 
@@ -55,10 +58,14 @@ skill projected) is recorded against `opencharly/opencharly#291`.
   production default (API keys are secrets, never committed); the opencharly org
   GitHub settings can override every value, since each name is an org VARIABLE
   (`AI_REVIEW_API_KEY` is a SECRET) forwarded to the runner as env.
-- A step-list change belongs in `review-plan.yml`; the `ai-review.yml` workflow
-  never changes for that.
-- The full review rulebook is `AI_REVIEW_PROMPT` in `charly.yml` — keep the
-  prompt actually in force OBVIOUS, not hidden in org settings.
+- There is no step list and no plan file: what a review runs is configured by the
+  env alone, so retuning a review is a `charly.yml` change or an org-variable change —
+  never a workflow edit.
+- The rulebook actually in force is the org variable `AI_REVIEW_PROMPT`; the
+  committed `charly.yml` default MUST be a byte-for-byte copy of it (both gates
+  forward the variable, so the committed copy is the fallback and the in-tree
+  reading). Re-sync that copy whenever the variable changes — a drifted copy is the
+  two-rulebooks defect of `opencharly/.github#126`.
 
 ## Landing
 

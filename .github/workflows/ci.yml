@@ -27,7 +27,19 @@ jobs:
       - name: config gates
         run: |
           charly box validate
-          test -f review-plan.yml && test -f prompt/validator.md && grep -q '^Verdict: PASS' prompt/validator.md && echo PROMPT_OK
+          # The retired `--plan` mechanism is GONE (opencharly/.github#126, R5): no
+          # plan file, no prompt file, no path knob in the contract. A reappearing
+          # file would be a regression, so this gate asserts ABSENCE.
+          for f in review-plan.yml prompt/validator.md; do
+            [ ! -e "$f" ] || { echo "::error::$f is retired (opencharly/.github#126) but present"; exit 1; }
+          done
+          if grep -n 'REVIEW_PLAN_PATH\|REVIEW_PROMPT_PATH' charly.yml; then
+            echo "::error::charly.yml still declares a retired review-path knob (opencharly/.github#126)"
+            exit 1
+          fi
+          # The rulebook in force is the org variable AI_REVIEW_PROMPT, forwarded by
+          # BOTH gates; charly.yml carries the committed default for the same knob.
+          grep -q '^[[:space:]]*AI_REVIEW_PROMPT: |' charly.yml && echo PROMPT_OK
       - name: workflow lint (actionlint)
         uses: docker://rhysd/actionlint:latest
         with:
