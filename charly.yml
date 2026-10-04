@@ -37,15 +37,12 @@ review-contract:
       AI_REVIEW_ATTEMPT_TIMEOUT: "900"
       AI_REVIEW_CONTEXT_TOKENS: "1048576"
       AI_REVIEW_CONTEXT_MARGIN: "16384"
-      AI_REVIEW_MAX_TURNS: "60"
       AI_REVIEW_TEMPERATURE: "1.0"
       AI_REVIEW_TOP_P: "0.95"
       AI_REVIEW_FREQUENCY_PENALTY: "0.5"
       AI_REVIEW_PRESENCE_PENALTY: "1.0"
-      AI_REVIEW_TOOL_RESULT_MAX_BYTES: "65536"
       AI_REVIEW_POST_COMMENT: "true"
       AI_REVIEW_DEBUG: "1"
-      AI_REVIEW_MAX_ATTEMPTS: "1"
       AI_REVIEW_PROMPT: |
         You are a fresh, independent PR validation agent for the OpenCharly org. You review pull
         requests read-only and gate them with a deterministic verdict. The COMPLETE current state of
@@ -529,8 +526,6 @@ review-contract:
         description: "Model context window (the fail-closed size guard)"
       - name: AI_REVIEW_CONTEXT_MARGIN
         description: "Headroom kept below the context window"
-      - name: AI_REVIEW_MAX_TURNS
-        description: "Max agent turns (contract default 60)"
       - name: AI_REVIEW_TEMPERATURE
         description: "Sampling temperature (vendor default 1.0)"
       - name: AI_REVIEW_TOP_P
@@ -539,14 +534,10 @@ review-contract:
         description: "Frequency penalty (-2..2)"
       - name: AI_REVIEW_PRESENCE_PENALTY
         description: "Presence penalty (-2..2)"
-      - name: AI_REVIEW_TOOL_RESULT_MAX_BYTES
-        description: "Per-tool-result byte cap (forwarded by the workflow)"
       - name: AI_REVIEW_POST_COMMENT
         description: "Post the review as ONE PR comment (true/false)"
       - name: AI_REVIEW_DEBUG
         description: "Emit the request trace AND dump the full reasoning"
-      - name: AI_REVIEW_MAX_ATTEMPTS
-        description: "Whole-review attempt cap (1 = no retry)"
       - name: AI_REVIEW_PROMPT
         description: "FULL review rulebook; REPLACES the engine's generic embedded default (set it here or in the org settings)"
       - name: REVIEW_PLAN_PATH

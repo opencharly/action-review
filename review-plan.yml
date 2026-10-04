@@ -9,5 +9,3 @@ steps:
   - id: review
     kind: review            # the core engine (B1–B6 of the plan)
     verdict: required       # must yield exactly one distinct Verdict: PASS|BLOCK
-    env:
-      - AI_REVIEW_MAX_TURNS

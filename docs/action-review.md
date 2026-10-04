@@ -12,7 +12,7 @@ in `charly.yml`; secrets arrive as GitHub secrets → job env vars.
 
 ## Environment (`ai-review`)
 
-Vars: AI_REVIEW_PROVIDER, AI_REVIEW_MODEL, AI_REVIEW_BASE_URL, AI_REVIEW_MAX_TURNS,
+Vars: AI_REVIEW_PROVIDER, AI_REVIEW_MODEL, AI_REVIEW_BASE_URL,
 CHARLY_VERSION (optional pin), REVIEW_RUNNER_LABEL (self-hosted opt-in).
 Secrets: AI_REVIEW_API_KEY. Automatic: GITHUB_TOKEN, PR_NUMBER.
 
