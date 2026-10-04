@@ -72,7 +72,6 @@ jobs:
           AI_REVIEW_PROVIDER: ${{ vars.AI_REVIEW_PROVIDER }}
           AI_REVIEW_MODEL:     ${{ vars.AI_REVIEW_MODEL }}
           AI_REVIEW_BASE_URL:  ${{ vars.AI_REVIEW_BASE_URL }}
-          AI_REVIEW_MAX_TURNS: ${{ vars.AI_REVIEW_MAX_TURNS || '20' }}
           AI_REVIEW_API_KEY:   ${{ secrets.AI_REVIEW_API_KEY }}
           REVIEW_PROMPT_PATH:  ${{ github.workspace }}/runner-config/prompt/validator.md
           REVIEW_PLAN_PATH:    ${{ github.workspace }}/runner-config/review-plan.yml
