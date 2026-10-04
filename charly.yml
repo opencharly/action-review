@@ -11,22 +11,23 @@ defaults:
 # full review rulebook is set RIGHT HERE as AI_REVIEW_PROMPT — so the prompt actually
 # in force is OBVIOUS, not hidden in the org settings.
 #
-# The opencharly org GitHub settings can OVERRIDE every value below: each AI_REVIEW_*
+# The opencharly org GitHub settings OVERRIDE every value below: each AI_REVIEW_*
 # name is an org VARIABLE (AI_REVIEW_API_KEY is a SECRET), and the workflow forwards
-# them to the runner as environment variables, so an org variable wins over the
-# default here. The org-wide copy of this contract lives in opencharly/.github
-# (charly.yml); the engine ships only a GENERIC rulebook default in its binary, which
-# AI_REVIEW_PROMPT replaces. There is exactly ONE prompt mechanism and NO plan file:
-# the review is configured by this contract's vars alone (opencharly/.github#126).
+# each one to the runner as an environment variable. A SET org variable governs the
+# run — measured on this gate's own live run: `reasoning_effort="medium"` (the org
+# value) took effect while this contract declares `high`, and `attempt_timeout=18m0s`
+# (the org's 1080 s) while this contract declares 900 s. The org-wide copy of this
+# contract lives in opencharly/.github (charly.yml); the engine ships only a GENERIC
+# 2857-byte rulebook default in its binary, which AI_REVIEW_PROMPT replaces. There is
+# exactly ONE prompt mechanism and NO plan file: the review is configured by this
+# contract's vars alone (opencharly/.github#126).
 #
 # THE COMMITTED RULEBOOK MUST EQUAL THE LIVE ONE. The AI_REVIEW_PROMPT value below is
 # a byte-for-byte copy of the opencharly org variable of the same name — check it with
 #   gh variable get AI_REVIEW_PROMPT --org opencharly | diff - <(the block below)
-# It is carried here so that (a) the rulebook actually in force is readable in-tree
-# rather than hidden in the org settings, and (b) an unset org variable still reviews
-# with the PROJECT rulebook instead of the engine's generic one. RE-SYNC it whenever
-# the org variable changes; a drifted copy is the two-rulebooks defect of
-# opencharly/.github#126.
+# It is carried here so that the rulebook in force is readable IN-TREE rather than only
+# in the org settings. RE-SYNC it whenever the org variable changes; a drifted copy is
+# the two-rulebooks defect of opencharly/.github#126.
 review-contract:
   candy:
     description: |

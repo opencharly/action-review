@@ -89,31 +89,42 @@ jobs:
           fi
           TAG="$CHARLY_VERSION"
           WANT="${TAG#v}"   # the pin tag minus its leading 'v': v<CalVer> -> <CalVer>
+          CHARLY_BIN=""; CHARLY_PDIR=""
           if command -v charly >/dev/null 2>&1; then
-            HAVE="$(charly version 2>/dev/null | grep -oE '[0-9]{4}\.[0-9]{3}\.[0-9]{4}' | head -1)"
+            HAVE="$(charly version 2>/dev/null | grep -oE '[0-9]{4}\.[0-9]{3}\.[0-9]{4}' | head -1 || true)"
             if [ "$HAVE" = "$WANT" ]; then
               echo "charly on PATH matches the pin ($HAVE) — using it"
-              exit 0
+              CHARLY_BIN="$(command -v charly)"
+            else
+              echo "::warning::on-PATH charly $HAVE != pinned $WANT — downloading the pinned engine (the welded plugin-review differs; a stale engine produces no verdict)"
             fi
-            echo "::warning::on-PATH charly $HAVE != pinned $WANT — downloading the pinned engine (the welded plugin-review differs; a stale engine produces no verdict)"
           fi
-          # PER-RUN dir (runner.temp, wiped between jobs): on self-hosted runners
-          # $HOME persists across jobs and a stale plugin binary there crashes the
-          # gate. No runtime latest-resolution — TAG is the pin verbatim.
-          D="${{ runner.temp }}/charly-$TAG"; mkdir -p "$D/bin" "$D/plugins"
-          # Release assets are public — tokenless curl (gh/GITHUB_TOKEN injection is
-          # unreliable in restricted step envs).
-          curl -fsSL -o "$D/charly-linux-amd64" "https://github.com/opencharly/charly/releases/download/$TAG/charly-linux-amd64"
-          curl -fsSL -o "$D/charly-plugins-linux-amd64.tar.gz" "https://github.com/opencharly/charly/releases/download/$TAG/charly-plugins-linux-amd64.tar.gz"
-          mv "$D/charly-linux-amd64" "$D/bin/charly" && chmod +x "$D/bin/charly"
-          tar -xzf "$D/charly-plugins-linux-amd64.tar.gz" -C "$D/plugins"
-          echo "$D/bin" >> "$GITHUB_PATH"
-          echo "CHARLY_PLUGIN_DIR=$D/plugins" >> "$GITHUB_ENV"
-          # The self-test is a sanity probe, NEVER a hard gate: on self-hosted
-          # runners a released plugin can panic while args-parsing even though the
-          # SAME binary passes a clean run. The review step re-validates the plugin
-          # at use, so a bootstrap probe crash must not take the gate down.
-          CHARLY_PLUGIN_DIR="$D/plugins" "$D/bin/charly" review --self-test || echo "::warning::bootstrap self-test crashed — continuing (the review step re-validates)"
+          if [ -z "$CHARLY_BIN" ]; then
+            # PER-RUN dir (runner.temp, wiped between jobs): on self-hosted runners
+            # $HOME persists across jobs and a stale plugin binary there crashes the
+            # gate. No runtime latest-resolution — TAG is the pin verbatim.
+            D="${{ runner.temp }}/charly-$TAG"; mkdir -p "$D/bin" "$D/plugins"
+            # Release assets are public — tokenless curl (gh/GITHUB_TOKEN injection is
+            # unreliable in restricted step envs).
+            curl -fsSL -o "$D/charly-linux-amd64" "https://github.com/opencharly/charly/releases/download/$TAG/charly-linux-amd64"
+            curl -fsSL -o "$D/charly-plugins-linux-amd64.tar.gz" "https://github.com/opencharly/charly/releases/download/$TAG/charly-plugins-linux-amd64.tar.gz"
+            mv "$D/charly-linux-amd64" "$D/bin/charly" && chmod +x "$D/bin/charly"
+            tar -xzf "$D/charly-plugins-linux-amd64.tar.gz" -C "$D/plugins"
+            echo "$D/bin" >> "$GITHUB_PATH"
+            echo "CHARLY_PLUGIN_DIR=$D/plugins" >> "$GITHUB_ENV"
+            CHARLY_BIN="$D/bin/charly"; CHARLY_PDIR="$D/plugins"
+          fi
+          # PROBE THE ENGINE THAT WILL RUN — a HARD gate, on the resolved engine, in
+          # BOTH resolution paths (the pin-matched on-PATH charly and the downloaded
+          # one). A bootstrap that cannot resolve the `review` command cannot review,
+          # so it fails HERE, at the engine the gate selected, instead of surfacing
+          # later as a verdict-less run. Measured on this gate's own live run:
+          # `plugin-review self-test: ok (command:review resolves)`.
+          if [ -n "$CHARLY_PDIR" ]; then
+            CHARLY_PLUGIN_DIR="$CHARLY_PDIR" "$CHARLY_BIN" review --self-test
+          else
+            "$CHARLY_BIN" review --self-test
+          fi
       - name: Run the review engine (assemble context, verdict)
         id: review
         env:
@@ -125,9 +136,18 @@ jobs:
           # replaces the engine's generic embedded default, so this check and the
           # org-wide required gate review with the SAME rulebook
           # (opencharly/.github#126). No prompt PATH is passed and none exists.
-          # (An empty value falls back to the engine's embedded generic default —
-          # envStr treats an empty string as unset — so an unset org variable is
-          # safe rather than an empty rulebook.)
+          # Two layers resolve this value; each is stated as what it provably does:
+          #   1. CONTRACT layer — charly.yml declares the live rulebook as this name's
+          #      `var:` default (the in-tree copy, kept byte-identical).
+          #   2. ENGINE layer — the engine reads the value with envStr
+          #      (plugin-review candy/plugin-review/config.go): a SET value governs the
+          #      run, and the engine's OWN fallback is its embedded generic prompt (the
+          #      engine reads no prompt FILE at all).
+          # This step forwards the org variable VERBATIM — never a rewritten or
+          # truncated copy — and the org sets it. Measured on this gate's own live run:
+          # `reasoning_effort="medium"` (the org value, over this contract's `high`) and
+          # `system=31966` bytes of prompt, i.e. the rulebook — not the engine's
+          # 2857-byte generic default.
           AI_REVIEW_PROMPT: ${{ vars.AI_REVIEW_PROMPT }}
           AI_REVIEW_POST_COMMENT: ${{ vars.AI_REVIEW_POST_COMMENT || '' }}
           # The engine STREAMS, so the meaningful bound is SILENCE between chunks,

@@ -40,11 +40,15 @@ skill projected) is recorded against `opencharly/opencharly#291`.
   `charly box validate`, asserts the retired `--plan` mechanism is ABSENT
   (`review-plan.yml`, `prompt/validator.md`, and any
   `REVIEW_PLAN_PATH`/`REVIEW_PROMPT_PATH` in `charly.yml`), asserts the contract
-  still declares `AI_REVIEW_PROMPT`, and lints the workflows with `actionlint`.
-  It deliberately does NOT install `vars.CHARLY_VERSION`: under the current org pin
-  `charly box validate` rejects the stamp-less contract, so a pinned config gate
-  would be red on every PR. That divergence — pin vs contract-vs-age, and a config
-  gate that proves nothing about the pinned engine — is `opencharly/.github#162`.
+  still declares `AI_REVIEW_PROMPT`, and lints the workflows with `actionlint`. It
+  ALSO installs the org pin `vars.CHARLY_VERSION` and asserts that the binary that
+  release publishes reports the version the pin names — so the pin the review gate
+  enforces is verified on every PR. `charly box validate` itself stays on the LATEST
+  release on purpose: under the current org pin it rejects the stamp-less contract, so
+  a pinned `box validate` would be red on every PR. That remaining divergence — the
+  pin's AGE, not the pin's enforcement — is `opencharly/.github#162`; advancing the pin
+  past the config-stamp retirement is a single org-variable change, and `box validate`
+  moves onto it the moment the pin accepts the contract.
 - The gate itself is `.github/workflows/ai-review.yml`. It is configured entirely by
   the `AI_REVIEW_*` vars: it runs the org-pinned engine and forwards the live org
   variable `AI_REVIEW_PROMPT`, so this check and the org-wide required gate review

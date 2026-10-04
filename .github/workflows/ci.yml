@@ -24,6 +24,42 @@ jobs:
           echo "$GH/bin" >> "$GITHUB_PATH"
           echo "CHARLY_PLUGIN_DIR=$GH/plugins" >> "$GITHUB_ENV"
           "$GH/bin/charly" version
+      - name: Verify the org pin the review gate runs (opencharly/.github#162)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHARLY_VERSION: ${{ vars.CHARLY_VERSION }}
+        run: |
+          # The REVIEW gate (.github/workflows/ai-review.yml) refuses to run an
+          # unpublished engine: it enforces vars.CHARLY_VERSION and downloads exactly
+          # that release. This step proves, on EVERY PR, the half of
+          # opencharly/.github#162 that is verifiable in-tree — that the pin is SET,
+          # visible to this repo, published, and that the binary it publishes reports
+          # the version it names. An unenforced pin is how the gate silently ran
+          # 2026.268.1917 while declaring v2026.271.0950 (#126).
+          #
+          # `charly box validate` below stays on the LATEST release ON PURPOSE: the pin's
+          # engine predates the retired config stamp and REJECTS this stamp-less contract
+          # (`schema 2026.261.1747 is required (found "")` — measured, and identical on
+          # the pristine tree). Moving `box validate` onto the pin is therefore a single
+          # org-variable change (advance the pin past the retirement), held by the
+          # operator on opencharly/.github#162; the moment the pin accepts the contract,
+          # it moves here. Nothing else is left: this step verifies the pin itself, and
+          # ai-review.yml verifies the engine that runs under it.
+          if [ -z "${CHARLY_VERSION:-}" ]; then
+            echo "::error::vars.CHARLY_VERSION is unset or not visible to this repo — the review gate cannot enforce an engine pin"
+            exit 1
+          fi
+          P="$HOME/.local/charly-pin"; mkdir -p "$P/bin"
+          gh release download "$CHARLY_VERSION" --repo opencharly/charly \
+            --pattern 'charly-linux-amd64' --dir "$P" --clobber
+          mv "$P/charly-linux-amd64" "$P/bin/charly" && chmod +x "$P/bin/charly"
+          WANT="${CHARLY_VERSION#v}"
+          GOT="$("$P/bin/charly" version | grep -oE '[0-9]{4}\.[0-9]{3}\.[0-9]{4}' | head -1 || true)"
+          echo "org pin $CHARLY_VERSION -> engine $GOT ($(sha256sum "$P/bin/charly" | cut -c1-12))"
+          if [ "$GOT" != "$WANT" ]; then
+            echo "::error::the pinned release $CHARLY_VERSION reports engine '$GOT' — the pin does not name the engine it installs"
+            exit 1
+          fi
       - name: config gates
         run: |
           charly box validate
