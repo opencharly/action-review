@@ -16,9 +16,9 @@ defaults:
 # each one to the runner as an environment variable. A SET org variable governs the
 # run — measured on this gate's own live run: `reasoning_effort="medium"` (the org
 # value) took effect while this contract declares `high`, and `attempt_timeout=18m0s`
-# (the org's 1080 s) while this contract declares 900 s. This is the ONE committed copy
-# of the contract (the former opencharly/.github charly.yml duplicate, which no runner read
-# and which had drifted, was deleted — opencharly/.github#165); the engine ships only a GENERIC
+# (the org's 1080 s) while this contract declares 900 s. This is the ONE live committed copy
+# of the contract: the opencharly/.github charly.yml duplicate, which no runner reads and which
+# has drifted, is deleted by opencharly/.github#181 (#165); the engine ships only a GENERIC
 # 2857-byte rulebook default in its binary, which AI_REVIEW_PROMPT replaces. There is
 # exactly ONE prompt mechanism and NO plan file: the review is configured by this
 # contract's vars alone (opencharly/.github#126).
