@@ -48,7 +48,7 @@ jobs:
     # GitHub's default (360) would let a doomed run occupy a runner for six hours.
     # Observed reviews conclude well inside 20 minutes; the cap makes the required
     # check go RED fast instead of hanging pending, and the gate is then re-run
-    # explicitly — never retried in-job (R4).
+    # explicitly — never retried in-job (R3).
     timeout-minutes: 20
     environment: ai-review
     steps:
@@ -179,7 +179,7 @@ jobs:
           rm -f /tmp/review.txt /tmp/review.log
 
           # bash -e must NOT abort here: a verdict-less run is a CLASS to report,
-          # not a crash. NO RETRY — a retry re-runs the same doomed generation (R4).
+          # not a crash. NO RETRY — a retry re-runs the same doomed generation (R3).
           rc=0
           charly review --out /tmp/review.txt > /tmp/review.log 2>&1 || rc=$?
           echo "review rc=$rc"
@@ -315,15 +315,15 @@ jobs:
           case "$INCONCLUSIVE_CLASS" in
             attempt-cap)
               class="whole-request cap (the ONE review call ran past AI_REVIEW_ATTEMPT_TIMEOUT and was cut; not retried)"
-              cause="**Root cause (measured in this run).** The engine's own terminal line names the class: the generation ran longer than the whole-request cap. A generation that long is a reasoning-length problem — compare \`reasoning_effort\` and \`max_tokens\` in the request line below with the org vars. Raising a cap only DETECTS a long generation; the effort and the token budget BOUND it (R4)."
+              cause="**Root cause (measured in this run).** The engine's own terminal line names the class: the generation ran longer than the whole-request cap. A generation that long is a reasoning-length problem — compare \`reasoning_effort\` and \`max_tokens\` in the request line below with the org vars. Raising a cap only DETECTS a long generation; the effort and the token budget BOUND it (R3)."
               ;;
             empty-completion)
               class="empty completion (the shared token budget was spent on reasoning before any answer; not retryable)"
-              cause="**Root cause (measured in this run).** The engine's own terminal line names the class: the model used the shared \`max_tokens\` budget on reasoning and produced no answer. A re-run with the same bounds reproduces it — raise \`AI_REVIEW_MAX_TOKENS\` (or lower \`AI_REVIEW_REASONING_EFFORT\`) instead of retrying (R4)."
+              cause="**Root cause (measured in this run).** The engine's own terminal line names the class: the model used the shared \`max_tokens\` budget on reasoning and produced no answer. A re-run with the same bounds reproduces it — raise \`AI_REVIEW_MAX_TOKENS\` (or lower \`AI_REVIEW_REASONING_EFFORT\`) instead of retrying (R3)."
               ;;
             provider-unanswered)
               class="provider unanswered (the endpoint stopped answering within the stream-idle bound)"
-              cause="**Root cause (measured in this run).** The model endpoint stopped answering — no response headers, or a stream that went silent past \`AI_REVIEW_STREAM_IDLE_TIMEOUT\`. That is a provider/endpoint matter, not a code finding; escalate to the operator rather than re-running in a loop (R4)."
+              cause="**Root cause (measured in this run).** The model endpoint stopped answering — no response headers, or a stream that went silent past \`AI_REVIEW_STREAM_IDLE_TIMEOUT\`. That is a provider/endpoint matter, not a code finding; escalate to the operator rather than re-running in a loop (R3)."
               ;;
             engine-terminal-other)
               class="the engine's own terminal line names the class (this workflow keeps no narrative for this marker, so it DEFERS to the line): $(printf '%s' "$ENGINE_TERMINAL" | cut -c1-180)"
@@ -337,7 +337,7 @@ jobs:
             echo
             echo "- class: $class"
             echo "- review exit code: ${REVIEW_RC:-n/a}"
-            echo "- in-job retries: none — the gate REPORTS the class instead of papering over it (R4)"
+            echo "- in-job retries: none — the gate REPORTS the class instead of papering over it (R3)"
             echo
             echo "$cause"
             echo
