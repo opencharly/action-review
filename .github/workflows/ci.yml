@@ -28,7 +28,7 @@ jobs:
           # VERIFYING the pin here, because the pin of that day (v2026.271.0950) predated the
           # config-stamp retirement (charly#754 / umbrella #340) and rejected this stamp-less
           # contract. The pin has since advanced past that retirement, so the workaround is
-          # gone. Measured 2026-07-14 with the pinned release v2026.278.0912 on this tree:
+          # gone. Measured 2026-10-13 with the pinned release v2026.278.0912 on this tree:
           #   charly box validate: OK — checked 5 candies, 7 distros, 7 builders; 0 warnings, 0 errors   (rc=0)
           # The same pinned engine now runs `box validate` below.
           if [ -z "${CHARLY_VERSION:-}" ]; then

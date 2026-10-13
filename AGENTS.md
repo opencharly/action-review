@@ -47,7 +47,7 @@ skill projected) is recorded against `opencharly/opencharly#291`.
   It used to install the LATEST release for `box validate` while only verifying the pin,
   because the pin of that day (`v2026.271.0950`) predated the config-stamp retirement
   (`charly#754` / umbrella `#340`) and rejected the stamp-less contract. The pin has since
-  advanced past that retirement — measured 2026-07-14, `v2026.278.0912` reports
+  advanced past that retirement — measured 2026-10-13, `v2026.278.0912` reports
   `charly box validate: OK — checked 5 candies, 7 distros, 7 builders; 0 warnings, 0 errors`
   on this tree — so the workaround is gone and the divergence is closed
   (`opencharly/.github#162`).
