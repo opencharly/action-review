@@ -13,46 +13,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install charly (release assets, same as the gate bootstrap)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          GH="$HOME/.local/charly"; mkdir -p "$GH/bin" "$GH/plugins"
-          gh release download --repo opencharly/charly --pattern 'charly-linux-amd64' --pattern 'charly-plugins-linux-amd64.tar.gz' --dir "$GH" --clobber
-          mv "$GH/charly-linux-amd64" "$GH/bin/charly" && chmod +x "$GH/bin/charly"
-          tar -xzf "$GH/charly-plugins-linux-amd64.tar.gz" -C "$GH/plugins"
-          echo "$GH/bin" >> "$GITHUB_PATH"
-          echo "CHARLY_PLUGIN_DIR=$GH/plugins" >> "$GITHUB_ENV"
-          "$GH/bin/charly" version
-      - name: Verify the org pin the review gate runs (opencharly/.github#162)
+      - name: Install the org-pinned charly and verify the pin names the engine it publishes (opencharly/.github#162)
         env:
           GH_TOKEN: ${{ github.token }}
           CHARLY_VERSION: ${{ vars.CHARLY_VERSION }}
         run: |
-          # The REVIEW gate (.github/workflows/ai-review.yml) refuses to run an
-          # unpublished engine: it enforces vars.CHARLY_VERSION and downloads exactly
-          # that release. This step proves, on EVERY PR, the half of
-          # opencharly/.github#162 that is verifiable in-tree — that the pin is SET,
-          # visible to this repo, published, and that the binary it publishes reports
-          # the version it names. An unenforced pin is how the gate silently ran
-          # 2026.268.1917 while declaring v2026.271.0950 (#126).
+          # ONE engine in this job: the org pin. The review gate
+          # (.github/workflows/ai-review.yml) refuses to run an unpublished engine — it
+          # enforces vars.CHARLY_VERSION and downloads exactly that release — so the config
+          # gate must validate the contract with the engine the gate RUNS, or it is green
+          # for an engine no gate ever runs (opencharly/.github#126, #162).
           #
-          # `charly box validate` below stays on the LATEST release ON PURPOSE: the pin's
-          # engine predates the retired config stamp and REJECTS this stamp-less contract
-          # (`schema 2026.261.1747 is required (found "")` — measured, and identical on
-          # the pristine tree). Moving `box validate` onto the pin is therefore a single
-          # org-variable change (advance the pin past the retirement), held by the
-          # operator on opencharly/.github#162; the moment the pin accepts the contract,
-          # it moves here. Nothing else is left: this step verifies the pin itself, and
-          # ai-review.yml verifies the engine that runs under it.
+          # This step used to install the LATEST release for `charly box validate` while only
+          # VERIFYING the pin here, because the pin of that day (v2026.271.0950) predated the
+          # config-stamp retirement (charly#754 / umbrella #340) and rejected this stamp-less
+          # contract. The pin has since advanced past that retirement, so the workaround is
+          # gone. Measured 2026-07-14 with the pinned release v2026.278.0912 on this tree:
+          #   charly box validate: OK — checked 5 candies, 7 distros, 7 builders; 0 warnings, 0 errors   (rc=0)
+          # The same pinned engine now runs `box validate` below.
           if [ -z "${CHARLY_VERSION:-}" ]; then
             echo "::error::vars.CHARLY_VERSION is unset or not visible to this repo — the review gate cannot enforce an engine pin"
             exit 1
           fi
-          P="$HOME/.local/charly-pin"; mkdir -p "$P/bin"
+          P="$HOME/.local/charly-pin"; mkdir -p "$P/bin" "$P/plugins"
           gh release download "$CHARLY_VERSION" --repo opencharly/charly \
-            --pattern 'charly-linux-amd64' --dir "$P" --clobber
+            --pattern 'charly-linux-amd64' --pattern 'charly-plugins-linux-amd64.tar.gz' --dir "$P" --clobber
           mv "$P/charly-linux-amd64" "$P/bin/charly" && chmod +x "$P/bin/charly"
+          tar -xzf "$P/charly-plugins-linux-amd64.tar.gz" -C "$P/plugins"
+          echo "$P/bin" >> "$GITHUB_PATH"
+          echo "CHARLY_PLUGIN_DIR=$P/plugins" >> "$GITHUB_ENV"
           WANT="${CHARLY_VERSION#v}"
           GOT="$("$P/bin/charly" version | grep -oE '[0-9]{4}\.[0-9]{3}\.[0-9]{4}' | head -1 || true)"
           echo "org pin $CHARLY_VERSION -> engine $GOT ($(sha256sum "$P/bin/charly" | cut -c1-12))"
@@ -60,8 +49,9 @@ jobs:
             echo "::error::the pinned release $CHARLY_VERSION reports engine '$GOT' — the pin does not name the engine it installs"
             exit 1
           fi
-      - name: config gates
+      - name: config gates (the org-pinned engine)
         run: |
+          echo "config gate engine: $(charly version | grep -oE '[0-9]{4}\.[0-9]{3}\.[0-9]{4}' | head -1)"
           charly box validate
           # The retired `--plan` mechanism is GONE (opencharly/.github#126, R5): no
           # plan file, no prompt file, no path knob in the contract. A reappearing
