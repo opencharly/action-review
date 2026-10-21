@@ -456,7 +456,13 @@ review-contract:
 
         COORD — Coordination duties (the rulebook Part II #6, #7, #11).
         - When the body or thread shows this PR blocks another open item, or is blocked by one, a
-          `BLOCKS` comment naming both sides must exist. The rulebook requires it on both threads.
+          `WAITING`/`HOLDING` comment naming both sides must exist. The rulebook requires it on
+          both threads.
+        - The legacy labels `BLOCKS` and `UNBLOCKS` are READ, never posted: a coordination comment
+          that opens with one is honoured only when it was created strictly BEFORE
+          `2026-10-24T00:00:00Z`; on or after that instant it is not a coordination comment at all.
+          No tooling accepts a legacy label — the current closed set is the only one a coordination
+          comment may open with.
         - On a contended or blocking scope, agent comments and the body end with the `Agent:` line
           FIRST and the `Assisted-by:` line LAST.
         - A successor PR names its predecessor.
@@ -588,13 +594,14 @@ review-contract:
           MUST end with the `Assisted-by:` line — see A1 — so `Agent:` precedes it). The `Agent:` line
           identifies the WORK, not the account (many agents share one GitHub account), so it is
           authoritative for "who is doing this". Treat it as attribution/coordination, never as a finding.
-          A subagent's footer may also name its PARENT — `*Agent: `<slug>` (subagent of `<parent-slug>`) · session `<ses_…>`*` — so the chain of responsibility is followable; treat it as coordination metadata, never a finding. A `CLAIM`/`TAKING OVER`/`HANDING OVER`/`BLOCKS` is addressed to the ACCOUNTABLE PARENT session, not merely a subagent.
+          A subagent's footer may also name its PARENT — `*Agent: `<slug>` (subagent of `<parent-slug>`) · session `<ses_…>`*` — so the chain of responsibility is followable; treat it as coordination metadata, never a finding. A `CLAIM`/`TAKING OVER`/`HANDING OVER`/`WAITING`/`HOLDING` is addressed to the ACCOUNTABLE PARENT session, not merely a subagent.
         - Coordination verbs. The first non-blank line of a coordination comment may be a label from a
-          closed set: `CLAIM`, `OWNING`, `HANDING OVER`, `TAKING OVER`, `BLOCKS`, `UNBLOCKS`,
-          `STATUS`, `RESOLVED`. A `TAKING OVER` names its authority (`hand-off`, `operator`,
-          `window-expired`). Treat these as coordination metadata, not as review findings. A
-          takeover waits for the 60-minute comment-first window; a PR closed and superseded names
-          its successor (`RESOLVED — superseded by #n`) and the successor names its predecessor.
+          closed set: `CLAIM`, `OWNING`, `HANDING OVER`, `TAKING OVER`, `WAITING`, `HOLDING`,
+          `CLEARED`, `STATUS`, `RESOLVED`. A `TAKING OVER` names its authority (`hand-off`,
+          `operator`, `window-expired`). Treat these as coordination metadata, not as review
+          findings. A takeover waits for the 60-minute comment-first window; a PR closed and
+          superseded names its successor (`RESOLVED — superseded by #n`) and the successor names
+          its predecessor.
     env_require:
       - name: RUNNER_ORG
         description: "GitHub org/user the runner registers with (self-hosted variant)"
