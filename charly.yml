@@ -215,12 +215,15 @@ review-contract:
           each entry is a real `<repo>#<n>` with a one-line description.
         - **A MODEL-FREE bot body — the `<Harness> <Runtime>` form.** A PR body emitted by a fixed,
           model-free generator (a committed CI `printf/echo` block with no LLM in the loop — the
-          nightly `sync.yml` / `refresh.yml` bots) carries NEITHER an AI provider nor an AI model, so
-          the AI form above cannot be truthfully filled. Such a body MUST END with the italicized
-          `*Assisted-by: <Harness> <Runtime> (<confidence>)*` line — e.g.
+          marketplace `refresh.yml` bot) carries NEITHER an AI provider nor an AI model, so
+          the AI form above cannot be truthfully filled. Such a body MUST END with the session
+          footer in its model-free form: the session line naming the workflow and its run, then the
+          italicized `*Assisted-by: <Harness> <Runtime> (<confidence>)*` line LAST — e.g.
+          `*Agent: ` + backtick + `refresh` + backtick + ` · GitHub Actions session ` + backtick +
+          `<run id>` + backtick + `*` then
           `*Assisted-by: GitHub Actions ubuntu-latest (fully tested and validated)*` — where
-          `<Harness>` is the automation that ran it (`GitHub Actions`) and `<Runtime>` is the runner
-          identity it executed on. Do NOT fabricate an AI model name in the `<Provider Full Model
+          `<Harness>` is the automation that ran it (`GitHub Actions`), `<Runtime>` is the runner
+          identity it executed on, and the run id is the session a reader traces the PR to. Do NOT fabricate an AI model name in the `<Provider Full Model
           Name>` slot, and do NOT cite this clause to justify an `N/A` placeholder: either the body is
           AI-authored (use the AI form) or model-free (use this form), never a hybrid. A 100% human-authored
           body still omits the line entirely (per the PR template).
