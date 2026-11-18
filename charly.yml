@@ -248,7 +248,7 @@ review-contract:
         - Cross-check the harness, provider, and full model name against the authoring runtime
           evidence in the body; a guessed or config-read name is a defect.
 
-        ### B. Ground-truth rules R0–R10 (one check per rule; the id IS the rule)
+        ### B. Ground-truth rules R0–R11 (one check per rule; the id IS the rule)
 
         R0 — skills honored. The change honors EVERY skill its area's Skill Dispatcher rows
         load. From the diff, identify what the change touches (candy, box, Go code, check verb,
@@ -339,6 +339,19 @@ review-contract:
           no failed step, run on the same binary version the PR names? A missing/contradictory
           summary, wrong or too-few beds (A2), an inflated tier, or a result you cannot reconcile
           from the diff are each a BLOCK.
+
+        R11 — conform to DESIGN (the ratchet). `DESIGN.md` (normative, requirement ids
+        `D-<AREA>-<n>`) and its schema `DESIGN.cue` define the target architecture. From the diff:
+        - A change that adds or reshapes a field, shape, kind, verb, capability or mechanism must
+          conform to the DESIGN requirement that governs it. The body's `## Rulebook compliance`
+          names the D-ids the change touches and states for each: conforms, amends DESIGN, or
+          design debt filed (an issue number). A new mechanism with no D-id cited BLOCKS.
+        - The change never moves code FURTHER from DESIGN. A diff that contradicts a cited D-id
+          without amending DESIGN in the same change BLOCKS.
+        - A change to `DESIGN.md`, `DESIGN.cue` or `design/` carries the `design-check` output
+          on the final tree in the body AND a maintainer sign-off comment (the T4 account rule).
+          Either missing BLOCKS.
+        - Existing non-conforming code the diff does not touch is design debt, not a finding.
 
         ### C. Pillars & mandates (verify where the change touches)
 
@@ -461,8 +474,10 @@ review-contract:
         - A coordination comment opens with one of the nine closed-set labels and nothing else; a
           comment whose first non-blank line is any other word is not a coordination comment and
           does not satisfy this check.
-        - On a contended or blocking scope, agent comments and the body end with the `Agent:` line
-          FIRST and the `Assisted-by:` line LAST.
+        - EVERY agent-authored PR body and agent comment ends with the session footer: the
+          `Agent:` line FIRST, naming the work slug, the harness and that harness's session id,
+          and the `Assisted-by:` line LAST. A body without a well-formed `Agent:` line BLOCKS,
+          contended or not: it is how a PR is traced to the session that made it.
         - A successor PR names its predecessor.
         The verbs themselves stay coordination metadata, never findings (see "Agent identity &
         coordination" below). What this check verifies is that the required ones are present.
@@ -586,13 +601,14 @@ review-contract:
 
         Agents coordinate on the live thread; the following are coordination metadata, NOT findings:
 
-        - Identity footer. An agent comment may end with two italic lines, in THIS order — first the
-          `*Agent: ` + backtick + `slug` + backtick + ` · session ses_…` + `*` identity line on its own
-          line, THEN the `*Assisted-by: <Harness> <Provider Model> (<tier>)*` trailer LAST (a PR body
+        - Identity footer. Every agent-authored PR body and comment ends with two italic lines, in
+          THIS order — first the `*Agent: ` + backtick + `slug` + backtick + ` · <Harness> session `
+          + backtick + `id` + backtick + `*` identity line on its own line (the harness is the one
+          the `Assisted-by:` trailer names; the id is that harness's own session id), THEN the `*Assisted-by: <Harness> <Provider Model> (<tier>)*` trailer LAST (a PR body
           MUST end with the `Assisted-by:` line — see A1 — so `Agent:` precedes it). The `Agent:` line
           identifies the WORK, not the account (many agents share one GitHub account), so it is
           authoritative for "who is doing this". Treat it as attribution/coordination, never as a finding.
-          A subagent's footer may also name its PARENT — `*Agent: `<slug>` (subagent of `<parent-slug>`) · session `<ses_…>`*` — so the chain of responsibility is followable; treat it as coordination metadata, never a finding. A `CLAIM`/`TAKING OVER`/`HANDING OVER`/`WAITING`/`HOLDING` is addressed to the ACCOUNTABLE PARENT session, not merely a subagent.
+          A subagent's footer may also name its PARENT — `*Agent: `<slug>` (subagent of `<parent-slug>`) · <Harness> session `<id>`*` — so the chain of responsibility is followable; treat it as coordination metadata, never a finding. A `CLAIM`/`TAKING OVER`/`HANDING OVER`/`WAITING`/`HOLDING` is addressed to the ACCOUNTABLE PARENT session, not merely a subagent.
         - Coordination verbs. The first non-blank line of a coordination comment may be a label from a
           closed set: `CLAIM`, `OWNING`, `HANDING OVER`, `TAKING OVER`, `WAITING`, `HOLDING`,
           `CLEARED`, `STATUS`, `RESOLVED`. A `TAKING OVER` names its authority (`hand-off`,
