@@ -203,7 +203,7 @@ review-contract:
           missing from the body's accounting is a defect);
         - a *How tested* block naming the exact change-class gate, the disposable target, the
           fresh-rebuild confirmation, whether the CHANGED code path executed live, AND pasted
-          output (not a promise);
+          output (not a promise) — and, whenever R12 applies, its `### Spike` block (see R12);
         - an *Attribution tier* justified by that evidence (never inflated);
         - a *Project-rulebook rule-compliance* section with EVERY applicable rule answered with a
           one-line HOW (or `N/A — <reason>` where the change class genuinely excludes it).
@@ -251,7 +251,7 @@ review-contract:
         - Cross-check the harness, provider, and full model name against the authoring runtime
           evidence in the body; a guessed or config-read name is a defect.
 
-        ### B. Ground-truth rules R0–R11 (one check per rule; the id IS the rule)
+        ### B. Ground-truth rules R0–R12 (one check per rule; the id IS the rule)
 
         R0 — skills honored. The change honors EVERY skill its area's Skill Dispatcher rows
         load. From the diff, identify what the change touches (candy, box, Go code, check verb,
@@ -279,6 +279,8 @@ review-contract:
           finding raised ON the PR is never filed away. The round's PR comment carries a fresh RCA
           that names the MISSED CONTROL (why the author's own pre-push gate did not catch it). A
           partial fix set, or a round with no such RCA, is a BLOCK.
+        - **The RCA is proved by R12.** A root cause the change acts on is proved by a working R12
+          candidate. A body that presents an RCA as proved with no working candidate behind it BLOCKS.
 
         R2 — no duplication. From the diff, look for patterns/predicates/filters/guards that
         land in a second place where one already exists. A copy-pasted block that should have been
@@ -356,13 +358,35 @@ review-contract:
           Either missing BLOCKS.
         - Existing non-conforming code the diff does not touch is design debt, not a finding.
 
+        R12 — spike every candidate solution before implementing. The RCA names the cause; before the
+        first implementation edit, the author lists every plausible solution for that cause and spikes
+        each one, on a live `disposable: true` target or against the real generator or artifact. The
+        candidate that works is the one implemented, and its success is the RCA's proof; a round in which
+        no candidate works means the RCA is wrong and must be redone. From the body and the diff:
+        - A change that fixes or implements behaviour carries a `### Spike` block under `## How tested`:
+          the RCA's claim, EVERY candidate spiked with its instrument, pasted command output, exit code
+          and result (works / fails), the winner, and the RCA verdict. A missing block BLOCKS.
+        - The candidates are the plausible solutions to the cause, never the cause itself. A round that
+          spiked one candidate and names no other plausible one (nor why none exists) BLOCKS.
+        - The diff implements the winner the round names. Implementing when the round reports no working
+          candidate, or implementing a candidate other than the winner, BLOCKS.
+        - A "spike" that only reads docs or code, or asserts a result with no pasted command output, is
+          not a spike and BLOCKS. You cannot re-run it: cross-check the pasted output for internal
+          consistency.
+        - An exemption is exactly one of: a typo, a comment, a prose-only change, a revert to a
+          previously proven state, or a spike-equivalent (a regression test that fails on the unmodified
+          tree and passes with the fix, or a live bed run at the exact boundary, pasted). The body names
+          the exemption and why it applies; an unnamed, invented or inapplicable exemption BLOCKS.
+        - A spike never replaces R10: the R10 proof of the final code is still required.
+
         ### C. Pillars & mandates (verify where the change touches)
 
         PIL — RDD / ADE / SDD:
-        - **RDD**: from the diff, if a HIGH-RISK assumption is touched (composition at latest
-          resolver-picked versions, a new architecture mechanism), check the body proves it on a
-          `disposable: true` bed — not from doc/code reading alone. Since you cannot re-run, verify
-          the body names the risk and the bed result.
+        - **RDD**: whenever the change fixes or implements behaviour, RDD's instrument is the R12
+          spike round — verify it under R12. A HIGH-RISK assumption the plan rests on (composition at
+          latest resolver-picked versions, a new architecture mechanism) is also proven on a
+          `disposable: true` bed, not from doc/code reading alone: verify the body names the risk and
+          the bed result.
         - **ADE**: EVERY new/changed candy in the diff must ship a non-empty `description:` AND a
           `plan:` with ≥1 deterministic `check:` step. `charly box validate` hard-errors otherwise —
           cross-check the candy diff for these fields. If either is absent, BLOCK.
