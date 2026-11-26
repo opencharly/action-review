@@ -1,8 +1,7 @@
 # AGENTS.md — action-review
 
-The GitHub Actions config for OpenCharly's AI PR-review gate — the replacement
-for the retired `opencharly/pi-review-action`, built on charly + the
-[plugin-review](https://github.com/opencharly/plugin-review) plugin only. The
+The GitHub Actions config for OpenCharly's AI PR-review gate, built on charly +
+the [plugin-review](https://github.com/opencharly/plugin-review) plugin only. The
 gate runs the welded `charly review` word on a standard GitHub runner by default
 (self-hosted opt-in via `vars.REVIEW_RUNNER_LABEL`), configured entirely from
 `charly.yml` — the rulebook in force being the org variable `AI_REVIEW_PROMPT`.
