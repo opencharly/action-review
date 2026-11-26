@@ -1,8 +1,7 @@
 # action-review
 
-The GitHub Actions config for OpenCharly's AI PR-review gate — the replacement for
-the retired `opencharly/pi-review-action`, built on charly + the
-[plugin-review](https://github.com/opencharly/plugin-review) plugin only.
+The GitHub Actions config for OpenCharly's AI PR-review gate, built on charly +
+the [plugin-review](https://github.com/opencharly/plugin-review) plugin only.
 
 - **Standard GitHub runner by default** (`runs-on: ${{ vars.REVIEW_RUNNER_LABEL || 'ubuntu-latest' }}`);
   the bootstrap step downloads `charly-linux-amd64` + `charly-plugins-linux-amd64.tar.gz`

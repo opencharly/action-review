@@ -1,8 +1,8 @@
 # action-review — the org AI PR-review gate (charly config)
 
-This repo declares the validator that replaced `opencharly/pi-review-action`: a
-GitHub Actions workflow (standard runner by default, self-hosted opt-in) that runs
-the `plugin-review` charly plugin. Everything except secrets is configured here
+This repo declares the org's AI PR-review gate: a GitHub Actions workflow
+(standard runner by default, self-hosted opt-in) that runs the `plugin-review`
+charly plugin. Everything except secrets is configured here
 in `charly.yml`; secrets arrive as GitHub secrets → job env vars.
 
 ## Repos
