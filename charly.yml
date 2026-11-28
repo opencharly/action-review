@@ -353,9 +353,10 @@ review-contract:
         - The body's `## Rulebook compliance` carries a `### Plan conformance` map: one row per
           PLANNED CHANGE (a field, shape, kind, verb, capability, mechanism, dependency or config
           key, or an emitted artifact), each naming the DESIGN.md / DESIGN.cue / design/ requirement
-          that governs it and the sentence of it the change satisfies. The disposition set is
-          exactly `conforms` and `debt filed #<n>`, and a `debt filed` row must name an issue the
-          body lists under `## Filed issues`. A touched surface with no row BLOCKS.
+          that governs it AND the evidence that the change conforms to it: `conforms — <the sentence
+          of the requirement it satisfies>`, or `debt filed #<n> — <why the gap is separable>`, whose
+          issue the body lists under `## Filed issues`. A bare `conforms` with no evidence BLOCKS, and
+          so does a `debt filed` row with no issue. A touched surface with no row BLOCKS.
         - A row that shows the change NOT conforming BLOCKS, and a disposition of `amends DESIGN`
           BLOCKS: R11 is conformance. The design is never edited to fit an implementation, and an
           implementation cutover carries no design change. A planned change no requirement governs
