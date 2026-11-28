@@ -346,16 +346,36 @@ review-contract:
           from the diff are each a BLOCK.
 
         R11 — conform to DESIGN (the ratchet). `DESIGN.md` (normative, requirement ids
-        `D-<AREA>-<n>`) and its schema `DESIGN.cue` define the target architecture. From the diff:
-        - A change that adds or reshapes a field, shape, kind, verb, capability or mechanism must
-          conform to the DESIGN requirement that governs it. The body's `## Rulebook compliance`
-          names the D-ids the change touches and states for each: conforms, amends DESIGN, or
-          design debt filed (an issue number). A new mechanism with no D-id cited BLOCKS.
-        - The change never moves code FURTHER from DESIGN. A diff that contradicts a cited D-id
-          without amending DESIGN in the same change BLOCKS.
-        - A change to `DESIGN.md`, `DESIGN.cue` or `design/` carries the `design-check` output
-          on the final tree in the body AND a maintainer sign-off comment (the T4 account rule).
-          Either missing BLOCKS.
+        `D-<AREA>-<n>`) and its schema `DESIGN.cue` define the target architecture, and R11 is
+        CONFORMANCE. It fires TWICE: over the PLAN, once the R12 round has named its winner and
+        before the first implementation edit, then over the DIFF before the push. From the body and
+        the diff:
+        - The body's `## Rulebook compliance` carries a `### Plan conformance` map: one row per
+          PLANNED CHANGE (a field, shape, kind, verb, capability, mechanism, dependency or config
+          key, or an emitted artifact), each naming the DESIGN.md / DESIGN.cue / design/ requirement
+          that governs it AND the evidence that the change conforms to it: `conforms — <the sentence
+          of the requirement it satisfies>`, or `debt filed #<n> — <why the gap is separable>`, whose
+          issue the body lists under `## Filed issues`. A bare `conforms` with no evidence BLOCKS, and
+          so does a `debt filed` row with no issue. A touched surface with no row BLOCKS.
+        - A row that shows the change NOT conforming BLOCKS, and a disposition of `amends DESIGN`
+          BLOCKS: R11 is conformance. The design is never edited to fit an implementation, and an
+          implementation cutover carries no design change. A planned change no requirement governs
+          is a row of an existing mechanism (§1.1 M1–M8) or the change is REDESIGNED — never an
+          exception, and never a design edit.
+        - The map must agree with the DIFF. A map saying no DESIGN-governed surface over a diff that
+          changes `DESIGN.md`/`DESIGN.cue`/`design/` BLOCKS, and so does a conformance map published
+          beside a diff that edits the design it claims to conform to.
+        - The ONE design-change form is the operator's own cutover. A diff that changes
+          `DESIGN.md`/`DESIGN.cue`/`design/` must carry the `Design change — <reason>` block form,
+          the `design-check` output on the final tree, and a maintainer sign-off comment (the T4
+          account rule); any of the three missing BLOCKS. An implementation PR that uses that form
+          to get past a mismatch BLOCKS — a plan that cannot conform is the operator's question,
+          not the agent's edit.
+        - The map's `**Winning candidate:**` names the SAME candidate the `### Spike` block's
+          `**Winner:**` names. A spike decides the mechanism, never its conformance: a diff that
+          implements a winner the map does not name (or names a different one) BLOCKS. The map
+          cannot prove it was written before the first edit — judge the two artifacts against each
+          other, and say so, rather than claiming an order the body cannot evidence.
         - Existing non-conforming code the diff does not touch is design debt, not a finding.
 
         R12 — spike every candidate solution before implementing. The RCA names the cause; before the
@@ -368,8 +388,10 @@ review-contract:
           and result (works / fails), the winner, and the RCA verdict. A missing block BLOCKS.
         - The candidates are the plausible solutions to the cause, never the cause itself. A round that
           spiked one candidate and names no other plausible one (nor why none exists) BLOCKS.
-        - The diff implements the winner the round names. Implementing when the round reports no working
-          candidate, or implementing a candidate other than the winner, BLOCKS.
+        - The diff implements the winner the round names, and that winner is the one the R11
+          plan-conformance map's `**Winning candidate:**` names. Implementing when the round
+          reports no working candidate, implementing a candidate other than the winner, or
+          implementing one the R11 map does not name, BLOCKS.
         - A "spike" that only reads docs or code, or asserts a result with no pasted command output, is
           not a spike and BLOCKS. You cannot re-run it: cross-check the pasted output for internal
           consistency.
